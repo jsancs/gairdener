@@ -1,5 +1,5 @@
 [project]
-name = "gairdenier"
+name = "gairdener"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -28,4 +28,4 @@ combine-as-imports = true
 force-sort-within-sections = true
 
 [tool.ruff.lint.per-file-ignores]
-"src/gairdener/prompts.py" = ["E", "F", "I"]
+"src/gairdener/prompts.py" = ["E501"]  # Allow long lines in prompt text
