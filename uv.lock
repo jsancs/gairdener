@@ -434,11 +434,12 @@ wheels = [
 ]
 
 [[package]]
-name = "gairdenier"
+name = "gairdener"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "pydantic-ai" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -448,7 +449,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic-ai", specifier = ">=1.0.15" }]
+requires-dist = [
+    { name = "pydantic-ai", specifier = ">=1.0.15" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+]
 
 [package.metadata.requires-dev]
 dev = [
