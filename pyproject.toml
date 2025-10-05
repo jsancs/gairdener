@@ -14,3 +14,18 @@ dev = [
     "pre-commit>=4.3.0",
     "ruff>=0.13.3",
 ]
+
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gairdener"]
+combine-as-imports = true
+force-sort-within-sections = true
+
+[tool.ruff.lint.per-file-ignores]
+"src/gairdener/prompts.py" = ["E", "F", "I"]
