@@ -1,5 +1,6 @@
+import 'dotenv/config';
 import { Model, Message } from 'gairdener-ai';
-import { runAgentLoop } from 'gairdener-agent';
+import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool } from 'gairdener-agent';
 import * as readline from 'node:readline/promises';
 
 const modelId = process.argv[2] || 'gpt-5-nano';
@@ -10,11 +11,17 @@ const mockModel: Model = { id: modelId, api, provider: 'openai', baseUrl: 'none'
 async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const messages: Message[] = [];
-  const context = { systemPrompt: 'You are Gairdener, a professional botanist and house plant expert.', messages };
+  const tools = [addPlantTool, listPlantsTool, recordWateringTool];
+  const context = { 
+    systemPrompt: 'You are Gairdener, a professional botanist and house plant expert. ' + 
+                  'You can manage a plant registry using your tools. Always check the registry with list_plants if you are unsure about the user plants.', 
+    messages, 
+    tools 
+  };
 
   console.log('Gairdener CLI - System Prompt: ' + context.systemPrompt);
   if (!apiKey) {
-    console.error('❌  ERROR: OPENAI_API_KEY not found in .env.');
+    console.error('ERROR: OPENAI_API_KEY not found in .env.');
     process.exit(1);
   }
   console.log('Using model: ' + modelId);
@@ -24,14 +31,17 @@ async function main() {
     const text = await rl.question('> ');
     if (!text) continue;
 
-    const loop = runAgentLoop([{ role: 'user', content: text, timestamp: Date.now() }], context, mockModel);
+    const userMsg: Message = { role: 'user', content: text, timestamp: Date.now() };
+    context.messages.push(userMsg);
+
+    const loop = runAgentLoop([], context, mockModel);
 
     for await (const event of loop) {
       if (event.type === 'message_update') {
         const delta = event.event.type === 'text_delta' ? event.event.delta : '';
         process.stdout.write(delta);
-      } else if (event.type === 'message_end') {
-        context.messages.push(event.message);
+      } else if (event.type === 'agent_end') {
+        context.messages.push(...event.messages.filter(m => m !== userMsg));
         process.stdout.write('\n');
       }
     }

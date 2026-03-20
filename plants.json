@@ -1,0 +1,13 @@
+{
+  "plants": {
+    "monty": {
+      "id": "monty",
+      "name": "Monty",
+      "species": "Photos",
+      "location": "Living Room",
+      "lastWatered": "2026-03-20T20:32:10.562Z",
+      "wateringFrequencyDays": 7,
+      "healthHistory": []
+    }
+  }
+}
