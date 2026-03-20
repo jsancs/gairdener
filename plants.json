@@ -1,11 +1,11 @@
 {
   "plants": {
-    "monty": {
-      "id": "monty",
-      "name": "Monty",
-      "species": "Photos",
+    "pothos---living-room-1": {
+      "id": "pothos---living-room-1",
+      "name": "Pothos - Living Room 1",
+      "species": "Epipremnum aureum",
       "location": "Living Room",
-      "lastWatered": "2026-03-20T20:32:10.562Z",
+      "lastWatered": "2026-03-20T20:37:22.701Z",
       "wateringFrequencyDays": 7,
       "healthHistory": []
     }
