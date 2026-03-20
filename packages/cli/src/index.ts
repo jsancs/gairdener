@@ -4,7 +4,7 @@ import * as readline from 'node:readline/promises';
 
 const modelId = process.argv[2] || 'gpt-5-nano';
 const apiKey = process.env.OPENAI_API_KEY;
-const api: any = apiKey ? 'openai-completions' : 'mock';
+const api: any = 'openai-completions';
 const mockModel: Model = { id: modelId, api, provider: 'openai', baseUrl: 'none', maxTokens: 4000 };
 
 async function main() {
@@ -14,7 +14,8 @@ async function main() {
 
   console.log('Gairdener CLI - System Prompt: ' + context.systemPrompt);
   if (!apiKey) {
-    console.warn('⚠️  OPENAI_API_KEY not found in .env. Running in MOCK MODE.');
+    console.error('❌  ERROR: OPENAI_API_KEY not found in .env.');
+    process.exit(1);
   }
   console.log('Using model: ' + modelId);
   console.log('Type your message below (Ctrl+C to exit):');

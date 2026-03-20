@@ -1,4 +1,4 @@
-export type Api = "openai-completions" | "mock";
+export type Api = "openai-completions";
 export type Provider = "openai" | "anthropic" | "google";
 export type ThinkingLevel = "minimal" | "low" | "medium" | "high" | "xhigh";
 
