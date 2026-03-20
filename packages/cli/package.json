@@ -1,0 +1,8 @@
+{
+  "name": "gairdener-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": { "build": "tsc" },
+  "dependencies": { "gairdener-ai": "*", "gairdener-agent": "*", "commander": "^12.1.0" },
+  "devDependencies": { "typescript": "^5.4.5" }
+}

@@ -1,20 +1,18 @@
 {
   "name": "gairdener",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "workspaces": ["packages/*"],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc -b",
+    "start": "node --env-file=.env packages/cli/dist/index.js",
+    "check": "npm run build"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jsancs/gairdener.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/jsancs/gairdener/issues"
-  },
-  "homepage": "https://github.com/jsancs/gairdener#readme"
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "zod": "^3.23.8",
+    "@sinclair/typebox": "^0.32.31",
+    "commander": "^12.1.0",
+    "@types/node": "^22.10.5"
+  }
 }
