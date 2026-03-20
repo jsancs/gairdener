@@ -25,11 +25,16 @@ async function main() {
     process.exit(1);
   }
   console.log('Using model: ' + modelId);
-  console.log('Type your message below (Ctrl+C to exit):');
+  console.log('Type your message below (Ctrl+C or /exit to quit):');
 
   while (true) {
     const text = await rl.question('> ');
     if (!text) continue;
+
+    if (text === '/exit') {
+      console.log('Goodbye!');
+      process.exit(0);
+    }
 
     const userMsg: Message = { role: 'user', content: text, timestamp: Date.now() };
     context.messages.push(userMsg);
