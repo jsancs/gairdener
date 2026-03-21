@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { Model, Message, ImageContent } from 'gairdener-ai';
-import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb } from 'gairdener-agent';
+import { Model, Message } from 'gairdener-ai';
+import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb, addHealthEntry } from 'gairdener-agent';
 import * as readline from 'node:readline/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -23,6 +23,9 @@ async function main() {
     tools 
   };
 
+  const PHOTO_DIR = path.resolve('photos');
+  await fs.mkdir(PHOTO_DIR, { recursive: true });
+
   console.log('Gairdener CLI - System Prompt: ' + context.systemPrompt);
   if (!apiKey) {
     console.error('ERROR: OPENAI_API_KEY not found in .env.');
@@ -41,7 +44,7 @@ async function main() {
   }
 
   console.log('Using model: ' + modelId);
-  console.log('Commands: /exit to quit, /photo <path> to upload a photo');
+  console.log('Commands: /exit to quit, /photo <path> [plantId] to upload a photo');
 
   while (true) {
     const text = await rl.question('> ');
@@ -55,21 +58,32 @@ async function main() {
     let userMessages: Message[] = [];
 
     if (text.startsWith('/photo ')) {
-      const photoPath = text.slice(7).trim();
+      const parts = text.slice(7).trim().split(' ');
+      const photoPath = parts[0];
+      const plantId = parts[1]; // Optional
+
       try {
         const data = await fs.readFile(photoPath);
         const base64 = data.toString('base64');
         const ext = path.extname(photoPath).slice(1);
         const mimeType = 'image/' + (ext === 'jpg' ? 'jpeg' : ext);
+        
+        const fileName = Date.now() + '-' + path.basename(photoPath);
+        const destPath = path.join(PHOTO_DIR, fileName);
+        await fs.writeFile(destPath, data);
+
         userMessages = [{
           role: 'user',
           content: [
-            { type: 'text', text: 'Analyze this plant photo:' },
+            { type: 'text', text: 'Analyze this plant photo' + (plantId ? ' for ' + plantId : '') + ':' },
             { type: 'image', data: base64, mimeType }
           ],
           timestamp: Date.now()
         }];
-        console.log('Uploading ' + photoPath + '...');
+        console.log('Uploaded and saved to ' + destPath);
+        if (plantId) {
+           await addHealthEntry(plantId, { date: new Date().toISOString(), status: 'healthy', observation: 'Uploaded via CLI', imagePath: destPath });
+        }
       } catch (err: any) {
         console.error('Error reading photo: ' + err.message);
         continue;

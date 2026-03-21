@@ -36,3 +36,11 @@ export async function loadPlantDb(): Promise<PlantDb> {
 export async function savePlantDb(db: PlantDb): Promise<void> {
   await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
 }
+
+export async function addHealthEntry(plantId: string, entry: HealthEntry): Promise<void> {
+  const db = await loadPlantDb();
+  if (db.plants[plantId]) {
+    db.plants[plantId].healthHistory.push(entry);
+    await savePlantDb(db);
+  }
+}
