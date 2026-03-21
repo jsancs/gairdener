@@ -18,75 +18,47 @@ export const listPlantsTool: AgentTool = {
   }
 };
 
-export const addPlantTool: AgentTool = {
-  name: 'add_plant',
-  description: 'Add a new plant to the registry.',
+export const manageRegistryTool: AgentTool = {
+  name: 'manage_registry',
+  description: 'Add, update, or delete plants in the registry.',
   parameters: {
     type: 'object',
     properties: {
-      name: { type: 'string' },
-      species: { type: 'string' },
-      location: { type: 'string' },
-      wateringFrequencyDays: { type: 'number' }
+      action: { type: 'string', enum: ['add', 'update', 'delete'], description: 'The action to perform.' },
+      plantId: { type: 'string', description: 'ID of the plant (required for update/delete).' },
+      name: { type: 'string', description: 'Display name (required for add).' },
+      species: { type: 'string', description: 'Botanical species.' },
+      location: { type: 'string', description: 'Where the plant is located.' },
+      wateringFrequencyDays: { type: 'number', description: 'Frequency in days.' }
     },
-    required: ['name', 'species']
+    required: ['action']
   },
-  execute: async (id, { name, species, location, wateringFrequencyDays }) => {
+  execute: async (id, { action, plantId, name, species, location, wateringFrequencyDays }) => {
     const db = await loadPlantDb();
-    const plantId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    if (db.plants[plantId]) throw new Error('Plant with ID ' + plantId + ' already exists.');
-    db.plants[plantId] = {
-      id: plantId, name, species, location: location || 'unknown',
-      lastWatered: new Date().toISOString(),
-      wateringFrequencyDays: wateringFrequencyDays || 7,
-      healthHistory: []
-    };
-    await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Added ' + name + ' (ID: ' + plantId + ')' }] };
-  }
-};
-
-export const updatePlantTool: AgentTool = {
-  name: 'update_plant',
-  description: 'Update metadata for an existing plant.',
-  parameters: {
-    type: 'object',
-    properties: {
-      plantId: { type: 'string' },
-      name: { type: 'string' },
-      species: { type: 'string' },
-      location: { type: 'string' },
-      wateringFrequencyDays: { type: 'number' }
-    },
-    required: ['plantId']
-  },
-  execute: async (id, { plantId, name, species, location, wateringFrequencyDays }) => {
-    const db = await loadPlantDb();
-    if (!db.plants[plantId]) throw new Error('Plant not found');
-    const p = db.plants[plantId];
-    if (name) p.name = name;
-    if (species) p.species = species;
-    if (location) p.location = location;
-    if (wateringFrequencyDays !== undefined) p.wateringFrequencyDays = wateringFrequencyDays;
-    await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Updated ' + p.name }] };
-  }
-};
-
-export const deletePlantTool: AgentTool = {
-  name: 'delete_plant',
-  description: 'Remove a plant and its history from the registry.',
-  parameters: {
-    type: 'object',
-    properties: { plantId: { type: 'string' } },
-    required: ['plantId']
-  },
-  execute: async (id, { plantId }) => {
-    const db = await loadPlantDb();
-    if (!db.plants[plantId]) throw new Error('Plant not found');
-    delete db.plants[plantId];
-    await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Deleted plant ' + plantId }] };
+    if (action === 'add') {
+      if (!name || !species) throw new Error('name and species are required to add a plant.');
+      const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      if (db.plants[id]) throw new Error('Plant already exists: ' + id);
+      db.plants[id] = { id, name, species, location: location || 'unknown', lastWatered: new Date().toISOString(), wateringFrequencyDays: wateringFrequencyDays || 7, healthHistory: [] };
+      await savePlantDb(db);
+      return { content: [{ type: 'text', text: 'Added ' + name + ' (ID: ' + id + ')' }] };
+    }
+    if (!plantId || !db.plants[plantId]) throw new Error('Valid plantId is required.');
+    if (action === 'delete') {
+      delete db.plants[plantId];
+      await savePlantDb(db);
+      return { content: [{ type: 'text', text: 'Deleted ' + plantId }] };
+    }
+    if (action === 'update') {
+      const p = db.plants[plantId];
+      if (name) p.name = name;
+      if (species) p.species = species;
+      if (location) p.location = location;
+      if (wateringFrequencyDays !== undefined) p.wateringFrequencyDays = wateringFrequencyDays;
+      await savePlantDb(db);
+      return { content: [{ type: 'text', text: 'Updated ' + plantId }] };
+    }
+    throw new Error('Unknown action.');
   }
 };
 
@@ -123,13 +95,11 @@ export const analyzePlantHealthTool: AgentTool = {
   execute: async (id, { plantId, status, observation, imagePath }) => {
     const db = await loadPlantDb();
     if (!db.plants[plantId]) throw new Error('Plant not found');
-    
     let finalRelativePath = imagePath;
     if (imagePath) {
       const STAGED_DIR = path.resolve('images/staged');
       const PLANT_DIR = path.resolve('images', plantId);
       const stagedFile = path.join(STAGED_DIR, imagePath);
-      
       try {
         await fs.access(stagedFile);
         const dateStr = new Date().toISOString().split('T')[0];
@@ -137,19 +107,9 @@ export const analyzePlantHealthTool: AgentTool = {
         await fs.mkdir(PLANT_DIR, { recursive: true });
         await fs.rename(stagedFile, path.join(PLANT_DIR, fileName));
         finalRelativePath = path.join(plantId, fileName);
-      } catch {
-        // If not in staged, maybe it is in another plant folder? 
-        // For now, if we can't find it in staged, we just store the path as is.
-      }
+      } catch {}
     }
-
-    db.plants[plantId].healthHistory.push({
-      date: new Date().toISOString(),
-      status,
-      observation,
-      imagePath: finalRelativePath
-    });
-    
+    db.plants[plantId].healthHistory.push({ date: new Date().toISOString(), status, observation, imagePath: finalRelativePath });
     await savePlantDb(db);
     return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name }] };
   }

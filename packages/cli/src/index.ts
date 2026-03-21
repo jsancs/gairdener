@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Model, Message } from 'gairdener-ai';
-import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb, updatePlantTool, deletePlantTool } from 'gairdener-agent';
+import { runAgentLoop, manageRegistryTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb } from 'gairdener-agent';
 import * as readline from 'node:readline/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -13,13 +13,13 @@ const mockModel: Model = { id: modelId, api, provider: 'openai', baseUrl: 'none'
 async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const messages: Message[] = [];
-  const tools = [addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, updatePlantTool, deletePlantTool];
+  const tools = [manageRegistryTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool];
   const context = { 
     systemPrompt: 'You are Gairdener, a professional botanist and house plant expert. ' + 
                   'You can manage a plant registry using your tools. Always check the registry with list_plants if you are unsure about the user plants. ' + 
                   'You can analyze photos of plants to identify them or diagnose health issues. ' + 
                   'To save an image permanently, use analyze_plant_health and pass the staged filename seen in the message. ' + 
-                  'If you make a mistake (e.g. duplicate a plant), use delete_plant or update_plant to fix it. ' + 
+                  'To add, update, or delete plants, use manage_registry. ' + 
                   'BE EXTREMELY CONCISE.', 
     messages, 
     tools 
