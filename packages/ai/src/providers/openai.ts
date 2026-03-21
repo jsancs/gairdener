@@ -16,15 +16,26 @@ export function streamOpenAICompletions(model: Model, context: Context, options?
       const messages: any[] = [];
       if (context.systemPrompt) messages.push({ role: 'developer', content: context.systemPrompt });
       for (const msg of context.messages) {
-        if (msg.role === 'user') messages.push({ role: 'user', content: msg.content });
-        else if (msg.role === 'assistant') {
+        if (msg.role === 'user') {
+          if (typeof msg.content === 'string') {
+            messages.push({ role: 'user', content: msg.content });
+          } else {
+            const content = msg.content.map(c => {
+              if (c.type === 'text') return { type: 'text', text: c.text };
+              if (c.type === 'image') return { type: 'image_url', image_url: { url: 'data:' + c.mimeType + ';base64,' + c.data } };
+              return null;
+            }).filter(Boolean);
+            messages.push({ role: 'user', content });
+          }
+        } else if (msg.role === 'assistant') {
           const text = msg.content.filter(c => c.type === 'text').map(c => (c as any).text).join('');
           const toolCalls = msg.content.filter(c => c.type === 'toolCall').map(c => ({
             id: (c as any).id, type: 'function', function: { name: (c as any).name, arguments: JSON.stringify((c as any).arguments) }
           }));
           messages.push({ role: 'assistant', content: text || null, tool_calls: toolCalls.length > 0 ? toolCalls : undefined });
         } else if (msg.role === 'toolResult') {
-          messages.push({ role: 'tool', tool_call_id: msg.toolCallId, content: (msg.content[0] as any).text });
+          const textResult = msg.content.filter(c => c.type === 'text').map(c => (c as any).text).join('\n');
+          messages.push({ role: 'tool', tool_call_id: msg.toolCallId, content: textResult || '(no content)' });
         }
       }
       const tools = context.tools?.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } }));

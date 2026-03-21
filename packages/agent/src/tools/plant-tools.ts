@@ -1,5 +1,5 @@
 import { AgentTool } from '../types.js';
-import { loadPlantDb, savePlantDb, Plant } from '../persistence/plant-db.js';
+import { loadPlantDb, savePlantDb, Plant, HealthEntry } from '../persistence/plant-db.js';
 
 export const listPlantsTool: AgentTool = {
   name: 'list_plants',
@@ -58,5 +58,27 @@ export const recordWateringTool: AgentTool = {
     db.plants[plantId].lastWatered = new Date().toISOString();
     await savePlantDb(db);
     return { content: [{ type: 'text', text: 'Recorded watering for ' + db.plants[plantId].name + '.' }] };
+  }
+};
+
+export const analyzePlantHealthTool: AgentTool = {
+  name: 'analyze_plant_health',
+  description: 'Log a health observation for a plant.',
+  parameters: {
+    type: 'object',
+    properties: {
+      plantId: { type: 'string' },
+      status: { type: 'string', enum: ['healthy', 'warning', 'sick'] },
+      observation: { type: 'string' }
+    },
+    required: ['plantId', 'status', 'observation']
+  },
+  execute: async (id, { plantId, status, observation }) => {
+    const db = await loadPlantDb();
+    if (!db.plants[plantId]) throw new Error('Plant not found: ' + plantId);
+    const entry: HealthEntry = { date: new Date().toISOString(), status, observation };
+    db.plants[plantId].healthHistory.push(entry);
+    await savePlantDb(db);
+    return { content: [{ type: 'text', text: 'Logged health status for ' + db.plants[plantId].name + ': ' + status }] };
   }
 };
