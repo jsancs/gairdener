@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { Model, Message } from 'gairdener-ai';
-import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb } from 'gairdener-agent';
+import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb, updatePlantTool, deletePlantTool } from 'gairdener-agent';
 import * as readline from 'node:readline/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -13,19 +13,19 @@ const mockModel: Model = { id: modelId, api, provider: 'openai', baseUrl: 'none'
 async function main() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const messages: Message[] = [];
-  const tools = [addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool];
+  const tools = [addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, updatePlantTool, deletePlantTool];
   const context = { 
     systemPrompt: 'You are Gairdener, a professional botanist and house plant expert. ' + 
                   'You can manage a plant registry using your tools. Always check the registry with list_plants if you are unsure about the user plants. ' + 
                   'You can analyze photos of plants to identify them or diagnose health issues. ' + 
-                  'When a photo is uploaded, you will see a staged filename like [staged: staged-123.jpg]. ' + 
-                  'To save it permanently, use analyze_plant_health and pass that filename as imagePath. ' + 
+                  'To save an image permanently, use analyze_plant_health and pass the staged filename seen in the message. ' + 
+                  'If you make a mistake (e.g. duplicate a plant), use delete_plant or update_plant to fix it. ' + 
                   'BE EXTREMELY CONCISE.', 
     messages, 
     tools 
   };
 
-  const STAGED_DIR = path.resolve('photos/staged');
+  const STAGED_DIR = path.resolve('images/staged');
   await fs.mkdir(STAGED_DIR, { recursive: true });
 
   if (!apiKey) {

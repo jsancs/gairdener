@@ -34,6 +34,7 @@ export const addPlantTool: AgentTool = {
   execute: async (id, { name, species, location, wateringFrequencyDays }) => {
     const db = await loadPlantDb();
     const plantId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (db.plants[plantId]) throw new Error('Plant with ID ' + plantId + ' already exists.');
     db.plants[plantId] = {
       id: plantId, name, species, location: location || 'unknown',
       lastWatered: new Date().toISOString(),
@@ -42,6 +43,50 @@ export const addPlantTool: AgentTool = {
     };
     await savePlantDb(db);
     return { content: [{ type: 'text', text: 'Added ' + name + ' (ID: ' + plantId + ')' }] };
+  }
+};
+
+export const updatePlantTool: AgentTool = {
+  name: 'update_plant',
+  description: 'Update metadata for an existing plant.',
+  parameters: {
+    type: 'object',
+    properties: {
+      plantId: { type: 'string' },
+      name: { type: 'string' },
+      species: { type: 'string' },
+      location: { type: 'string' },
+      wateringFrequencyDays: { type: 'number' }
+    },
+    required: ['plantId']
+  },
+  execute: async (id, { plantId, name, species, location, wateringFrequencyDays }) => {
+    const db = await loadPlantDb();
+    if (!db.plants[plantId]) throw new Error('Plant not found');
+    const p = db.plants[plantId];
+    if (name) p.name = name;
+    if (species) p.species = species;
+    if (location) p.location = location;
+    if (wateringFrequencyDays !== undefined) p.wateringFrequencyDays = wateringFrequencyDays;
+    await savePlantDb(db);
+    return { content: [{ type: 'text', text: 'Updated ' + p.name }] };
+  }
+};
+
+export const deletePlantTool: AgentTool = {
+  name: 'delete_plant',
+  description: 'Remove a plant and its history from the registry.',
+  parameters: {
+    type: 'object',
+    properties: { plantId: { type: 'string' } },
+    required: ['plantId']
+  },
+  execute: async (id, { plantId }) => {
+    const db = await loadPlantDb();
+    if (!db.plants[plantId]) throw new Error('Plant not found');
+    delete db.plants[plantId];
+    await savePlantDb(db);
+    return { content: [{ type: 'text', text: 'Deleted plant ' + plantId }] };
   }
 };
 
@@ -64,14 +109,14 @@ export const recordWateringTool: AgentTool = {
 
 export const analyzePlantHealthTool: AgentTool = {
   name: 'analyze_plant_health',
-  description: 'Log health observation. status: healthy, warning, sick.',
+  description: 'Log health observation. To save the staged photo, pass the staged filename.',
   parameters: {
     type: 'object',
     properties: {
       plantId: { type: 'string' },
       status: { type: 'string', enum: ['healthy', 'warning', 'sick'] },
       observation: { type: 'string' },
-      imagePath: { type: 'string', description: 'The staged filename provided in the message (e.g. staged-123.jpg).' }
+      imagePath: { type: 'string' }
     },
     required: ['plantId', 'status', 'observation']
   },
@@ -79,21 +124,22 @@ export const analyzePlantHealthTool: AgentTool = {
     const db = await loadPlantDb();
     if (!db.plants[plantId]) throw new Error('Plant not found');
     
-    let finalPath = imagePath;
+    let finalRelativePath = imagePath;
     if (imagePath) {
-      const STAGED_DIR = path.resolve('photos/staged');
-      const PHOTO_DIR = path.resolve('photos');
+      const STAGED_DIR = path.resolve('images/staged');
+      const PLANT_DIR = path.resolve('images', plantId);
       const stagedFile = path.join(STAGED_DIR, imagePath);
       
       try {
         await fs.access(stagedFile);
         const dateStr = new Date().toISOString().split('T')[0];
-        const fileName = plantId + '-' + dateStr + '-' + Date.now() + path.extname(imagePath);
-        await fs.mkdir(PHOTO_DIR, { recursive: true });
-        await fs.rename(stagedFile, path.join(PHOTO_DIR, fileName));
-        finalPath = fileName;
+        const fileName = dateStr + '-' + Date.now() + path.extname(imagePath);
+        await fs.mkdir(PLANT_DIR, { recursive: true });
+        await fs.rename(stagedFile, path.join(PLANT_DIR, fileName));
+        finalRelativePath = path.join(plantId, fileName);
       } catch {
-        // Not in staged, keep as is or ignore
+        // If not in staged, maybe it is in another plant folder? 
+        // For now, if we can't find it in staged, we just store the path as is.
       }
     }
 
@@ -101,10 +147,10 @@ export const analyzePlantHealthTool: AgentTool = {
       date: new Date().toISOString(),
       status,
       observation,
-      imagePath: finalPath
+      imagePath: finalRelativePath
     });
     
     await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name + (imagePath ? ' and saved photo.' : '.') }] };
+    return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name }] };
   }
 };
