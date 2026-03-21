@@ -47,9 +47,10 @@ export function streamOpenAICompletions(model: Model, context: Context, options?
       for await (const chunk of (openaiStream as any)) {
         const choice = chunk.choices[0];
         if (choice?.delta?.content) {
-          if (output.content.length === 0) output.content.push({ type: 'text', text: '' });
-          (output.content[0] as any).text += choice.delta.content;
-          stream.push({ type: 'text_delta', contentIndex: 0, delta: choice.delta.content, partial: output });
+          if (output.content.length === 0 || output.content[output.content.length-1].type !== 'text') output.content.push({ type: 'text', text: '' });
+          const last = output.content[output.content.length-1] as any;
+          last.text += choice.delta.content;
+          stream.push({ type: 'text_delta', contentIndex: output.content.length - 1, delta: choice.delta.content, partial: output });
         }
         if (choice?.delta?.tool_calls) {
           for (const tc of choice.delta.tool_calls) {
@@ -63,7 +64,7 @@ export function streamOpenAICompletions(model: Model, context: Context, options?
         }
         if (chunk.usage) output.usage = { input: chunk.usage.prompt_tokens, output: chunk.usage.completion_tokens, totalTokens: chunk.usage.total_tokens };
       }
-      for (const c of output.content) if (c.type === 'toolCall') { (c as any).arguments = JSON.parse((c as any).arguments); delete (c as any).index; }
+      for (const c of output.content) if (c.type === 'toolCall') { (c as any).arguments = JSON.parse((c as any).arguments || '{}'); delete (c as any).index; }
       stream.push({ type: 'done', reason: 'stop', message: output });
       stream.end();
     } catch (error: any) {

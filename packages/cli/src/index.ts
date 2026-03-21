@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { Model, Message, ImageContent } from 'gairdener-ai';
-import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb, addHealthEntry } from 'gairdener-agent';
+import { Model, Message } from 'gairdener-ai';
+import { runAgentLoop, addPlantTool, listPlantsTool, recordWateringTool, analyzePlantHealthTool, loadPlantDb } from 'gairdener-agent';
 import * as readline from 'node:readline/promises';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -18,14 +18,20 @@ async function main() {
     systemPrompt: 'You are Gairdener, a professional botanist and house plant expert. ' + 
                   'You can manage a plant registry using your tools. Always check the registry with list_plants if you are unsure about the user plants. ' + 
                   'You can analyze photos of plants to identify them or diagnose health issues. ' + 
-                  'When a user uploads a photo via /photo, analyze it and use analyze_plant_health to log the status if you can identify the plant. ' + 
-                  'BE EXTREMELY CONCISE. No conversational filler.', 
+                  'When a photo is uploaded, you will see a staged filename like [staged: staged-123.jpg]. ' + 
+                  'To save it permanently, use analyze_plant_health and pass that filename as imagePath. ' + 
+                  'BE EXTREMELY CONCISE.', 
     messages, 
     tools 
   };
 
-  const PHOTO_DIR = path.resolve('photos');
-  await fs.mkdir(PHOTO_DIR, { recursive: true });
+  const STAGED_DIR = path.resolve('photos/staged');
+  await fs.mkdir(STAGED_DIR, { recursive: true });
+
+  if (!apiKey) {
+    console.error('ERROR: OPENAI_API_KEY not found in .env.');
+    process.exit(1);
+  }
 
   const db = await loadPlantDb();
   const overdue = Object.values(db.plants).filter(p => {
@@ -39,7 +45,7 @@ async function main() {
   }
 
   console.log('Using model: ' + modelId);
-  console.log('Commands: /exit to quit, /photo <path> [optional description] to upload');
+  console.log('Commands: /exit to quit, /photo <path> [description] to analyze an image');
 
   while (true) {
     const text = await rl.question('> ');
@@ -53,9 +59,10 @@ async function main() {
     let userMessages: Message[] = [];
 
     if (text.startsWith('/photo ')) {
-      const parts = text.slice(7).trim().split(' ');
-      const photoPath = parts[0];
-      const description = parts.slice(1).join(' ') || 'Analyze this plant photo:';
+      const photoArg = text.slice(7).trim();
+      const firstSpace = photoArg.indexOf(' ');
+      const photoPath = firstSpace !== -1 ? photoArg.slice(0, firstSpace) : photoArg;
+      const description = firstSpace !== -1 ? photoArg.slice(firstSpace).trim() : 'Analyze this plant photo';
 
       try {
         const data = await fs.readFile(photoPath);
@@ -63,20 +70,18 @@ async function main() {
         const ext = path.extname(photoPath).slice(1);
         const mimeType = 'image/' + (ext === 'jpg' ? 'jpeg' : ext);
         
-        const dateStr = new Date().toISOString().split('T')[0];
-        const fileName = 'upload-' + dateStr + '-' + path.basename(photoPath);
-        const destPath = path.join(PHOTO_DIR, fileName);
-        await fs.writeFile(destPath, data);
+        const fileName = 'staged-' + Date.now() + '.' + ext;
+        await fs.writeFile(path.join(STAGED_DIR, fileName), data);
 
         userMessages = [{
           role: 'user',
           content: [
-            { type: 'text', text: description + ' (Saved as ' + fileName + ')' },
+            { type: 'text', text: description + ' [staged: ' + fileName + ']' },
             { type: 'image', data: base64, mimeType }
           ],
           timestamp: Date.now()
         }];
-        console.log('Uploaded ' + photoPath);
+        console.log('Staged photo as ' + fileName);
       } catch (err: any) {
         console.error('Error: ' + err.message);
         continue;

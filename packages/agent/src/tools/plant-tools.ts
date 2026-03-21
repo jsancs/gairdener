@@ -1,5 +1,7 @@
 import { AgentTool } from '../types.js';
-import { loadPlantDb, savePlantDb, Plant, HealthEntry } from '../persistence/plant-db.js';
+import { loadPlantDb, savePlantDb } from '../persistence/plant-db.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 
 export const listPlantsTool: AgentTool = {
   name: 'list_plants',
@@ -62,22 +64,47 @@ export const recordWateringTool: AgentTool = {
 
 export const analyzePlantHealthTool: AgentTool = {
   name: 'analyze_plant_health',
-  description: 'Log health observation. Status: healthy, warning, sick.',
+  description: 'Log health observation. status: healthy, warning, sick.',
   parameters: {
     type: 'object',
     properties: {
       plantId: { type: 'string' },
       status: { type: 'string', enum: ['healthy', 'warning', 'sick'] },
       observation: { type: 'string' },
-      imagePath: { type: 'string', description: 'The filename of the uploaded photo if applicable.' }
+      imagePath: { type: 'string', description: 'The staged filename provided in the message (e.g. staged-123.jpg).' }
     },
     required: ['plantId', 'status', 'observation']
   },
   execute: async (id, { plantId, status, observation, imagePath }) => {
     const db = await loadPlantDb();
     if (!db.plants[plantId]) throw new Error('Plant not found');
-    db.plants[plantId].healthHistory.push({ date: new Date().toISOString(), status, observation, imagePath });
+    
+    let finalPath = imagePath;
+    if (imagePath) {
+      const STAGED_DIR = path.resolve('photos/staged');
+      const PHOTO_DIR = path.resolve('photos');
+      const stagedFile = path.join(STAGED_DIR, imagePath);
+      
+      try {
+        await fs.access(stagedFile);
+        const dateStr = new Date().toISOString().split('T')[0];
+        const fileName = plantId + '-' + dateStr + '-' + Date.now() + path.extname(imagePath);
+        await fs.mkdir(PHOTO_DIR, { recursive: true });
+        await fs.rename(stagedFile, path.join(PHOTO_DIR, fileName));
+        finalPath = fileName;
+      } catch {
+        // Not in staged, keep as is or ignore
+      }
+    }
+
+    db.plants[plantId].healthHistory.push({
+      date: new Date().toISOString(),
+      status,
+      observation,
+      imagePath: finalPath
+    });
+    
     await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name }] };
+    return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name + (imagePath ? ' and saved photo.' : '.') }] };
   }
 };
