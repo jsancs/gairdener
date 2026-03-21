@@ -9,7 +9,7 @@ export const listPlantsTool: AgentTool = {
     const db = await loadPlantDb();
     const plants = Object.values(db.plants).map(p => ({
        ...p,
-       healthHistory: p.healthHistory.slice(-3) // Send only last 3 for context
+       healthHistory: p.healthHistory.slice(-5)
     }));
     if (plants.length === 0) return { content: [{ type: 'text', text: 'No plants found in the registry.' }] };
     return { content: [{ type: 'text', text: JSON.stringify(plants, null, 2) }] };
@@ -31,7 +31,7 @@ export const addPlantTool: AgentTool = {
   },
   execute: async (id, { name, species, location, wateringFrequencyDays }) => {
     const db = await loadPlantDb();
-    const plantId = name.toLowerCase().replace(/\s+/g, '-');
+    const plantId = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     db.plants[plantId] = {
       id: plantId, name, species, location: location || 'unknown',
       lastWatered: new Date().toISOString(),
@@ -39,7 +39,7 @@ export const addPlantTool: AgentTool = {
       healthHistory: []
     };
     await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Added ' + name }] };
+    return { content: [{ type: 'text', text: 'Added ' + name + ' (ID: ' + plantId + ')' }] };
   }
 };
 
@@ -68,15 +68,16 @@ export const analyzePlantHealthTool: AgentTool = {
     properties: {
       plantId: { type: 'string' },
       status: { type: 'string', enum: ['healthy', 'warning', 'sick'] },
-      observation: { type: 'string' }
+      observation: { type: 'string' },
+      imagePath: { type: 'string', description: 'The filename of the uploaded photo if applicable.' }
     },
     required: ['plantId', 'status', 'observation']
   },
-  execute: async (id, { plantId, status, observation }) => {
+  execute: async (id, { plantId, status, observation, imagePath }) => {
     const db = await loadPlantDb();
     if (!db.plants[plantId]) throw new Error('Plant not found');
-    db.plants[plantId].healthHistory.push({ date: new Date().toISOString(), status, observation });
+    db.plants[plantId].healthHistory.push({ date: new Date().toISOString(), status, observation, imagePath });
     await savePlantDb(db);
-    return { content: [{ type: 'text', text: 'Logged health for ' + db.plants[plantId].name }] };
+    return { content: [{ type: 'text', text: 'Updated health for ' + db.plants[plantId].name }] };
   }
 };
